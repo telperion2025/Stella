@@ -36,8 +36,22 @@ class UndoHistory:
             and self._undo[-1].deleted == ""
             and self._undo[-1].pos + len(self._undo[-1].inserted) == pos
         ):
+            # merge consecutive typed characters into one undo step
             prev = self._undo[-1]
             prev.inserted += inserted
+            return
+        if (
+            deleted
+            and not inserted
+            and self._undo
+            and self._undo[-1].inserted == ""
+            and self._undo[-1].deleted
+            and self._undo[-1].pos == pos + 1
+        ):
+            # merge consecutive char deletions (e.g. backspace runs)
+            prev = self._undo[-1]
+            prev.pos = pos
+            prev.deleted = deleted + prev.deleted
             return
         self._undo.append(entry)
         if len(self._undo) > self.limit:

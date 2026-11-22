@@ -43,7 +43,8 @@ class Editor:
         self.vi_pending = None   # pending vi operator: 'd' or 'y'
         self.prompt = None       # (label, text) while prompting
         self.dragging = False
-        self.block_active = False  # a WordStar block mark survives cursor moves
+        self.block_active = False   # a WordStar block mark survives cursor moves
+        self.block_end_set = False  # whether ^B E was pressed after ^B B
 
     # ------------------------------------------------------------------
     # helpers
@@ -251,12 +252,15 @@ class Editor:
         end = start + self.buffer.line_length(line)
         if line + 1 < self.buffer.line_count:
             end += 1  # include the newline
+            yank = self.buffer.line(line) + "\n"
         elif line > 0:
             start -= 1  # no next line: remove the preceding newline instead
+            yank = self.buffer.line(line) + "\n"
+        else:
+            yank = self.buffer.line(line)
         if end > start:
-            removed = self.buffer.slice(start, end)
             self.apply_edit(start, end - start, "", cursor=start)
-            self.clipboard.copy(removed)
+            self.clipboard.copy(yank)
 
     def open_line(self, below=True):
         line, _col = self.line_col()
@@ -347,6 +351,9 @@ class Editor:
             return
         dest = self.cursor
         sel = self.selection
+        if sel.start <= dest <= sel.end:
+            self.set_message("Destination is inside the block", error=True)
+            return
         text = blocks.selected_text(self.buffer, sel)
         start, end = sel.start, sel.end
         self.apply_edit(start, end - start, "", cursor=start)
@@ -671,26 +678,32 @@ class Editor:
         elif prefix == "B":
             if ch == "B":
                 self.block_active = True
+                self.block_end_set = False
                 self.selection = blocks.Selection(self.cursor)
                 self.set_message("Block begin marked")
             elif ch == "E":
                 if self.selection is None:
                     self.selection = blocks.Selection(self.cursor)
                 self.block_active = True
+                self.block_end_set = True
                 self.selection.cursor = self.cursor
                 self.set_message("Block end marked (%d chars)" % len(self.selection))
-            elif ch == "C":
-                self.copy_selection()
+            elif ch in ("C", "M", "D"):
+                # with only ^B B marked, the cursor is the implicit block end
+                if self.selection is not None and not self.block_end_set:
+                    self.selection.cursor = self.cursor
+                if ch == "C":
+                    self.copy_selection()
+                elif ch == "M":
+                    self.move_block()
+                else:
+                    self.delete_selection()
                 self.block_active = False
-            elif ch == "M":
-                self.move_block()
-                self.block_active = False
-            elif ch == "D":
-                self.delete_selection()
-                self.block_active = False
+                self.block_end_set = False
             elif ch == "U":
                 self.selection = None
                 self.block_active = False
+                self.block_end_set = False
                 self.set_message("Block unmarked")
             else:
                 self.set_message("Unknown ^B command: %s" % ch, error=True)
@@ -830,7 +843,10 @@ class Editor:
             elif c == "v":
                 self.mode = "visual"
                 if self.selection is None:
-                    self.selection = blocks.Selection(self.cursor)
+                    self.selection = blocks.Selection(self.cursor, inclusive=True)
+                else:
+                    self.selection.inclusive = True
+                    self.selection.cursor = self.cursor
             elif c == "V":
                 self.mode = "visual"
                 line, _col = self.line_col()
@@ -870,6 +886,8 @@ class Editor:
     def vi_visual(self, kind, val):
         if kind == "key" and val == "ESC":
             self.mode = "normal"
+            if self.selection is not None:
+                self.selection.inclusive = False
             return
         if kind == "char" and val == "d":
             self.cut_selection()
@@ -881,6 +899,7 @@ class Editor:
             return
         if kind == "char" and val == "V":
             line, _col = self.line_col()
+            self.selection.inclusive = False
             self.selection.cursor = self.buffer.line_start(line) + self.buffer.line_length(line)
             return
         self.vi_motion(kind, val, extend=True)

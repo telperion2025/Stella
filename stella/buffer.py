@@ -97,7 +97,8 @@ class GapBuffer:
         """Replace *length* chars at *pos* with *text*; returns removed text."""
         removed = self.slice(pos, pos + length)
         self.move_gap(pos)
-        self._right = self._right[length:] + text
+        self._right = self._right[length:]
+        self._left += text
         self._update_line_starts_on_delete(pos, removed)
         self._update_line_starts_on_insert(pos, text)
         return removed

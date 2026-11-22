@@ -17,6 +17,14 @@ for _name in ("UP", "DOWN", "LEFT", "RIGHT", "PPAGE", "NPAGE", "HOME", "END",
 HELP_LINE = "^K Files ^Q Search ^B Block F1 Help INS  ^C Copy ^W Cut ^V Paste"
 
 
+def _mono_attr(element):
+    attr = 0
+    for a in MONOCHROME.get(element, ["normal"]):
+        if a != "normal":
+            attr |= a
+    return attr
+
+
 def display_col(text, col, tab_width):
     """Display column (tab-expanded) of character column *col* in *text*."""
     x = 0
@@ -77,13 +85,22 @@ class Screen:
         except (termios.error, OSError, ValueError):
             pass
         if curses.has_colors():
-            curses.start_color()
+            try:
+                curses.start_color()
+            except curses.error:
+                pass
+            ncolors = max(2, curses.COLORS)
             theme = get_theme(self.config.get("theme", "wordstar"))
             if not isinstance(theme.get("edit"), tuple):
                 theme = MONOCHROME
             for i, (element, (fg, bg)) in enumerate(theme.items(), 1):
-                curses.init_pair(i, FOREGROUNDS[fg], FOREGROUNDS[bg])
-                self.attrs[element] = curses.color_pair(i)
+                fg_c = min(FOREGROUNDS[fg], ncolors - 1)
+                bg_c = min(FOREGROUNDS[bg], ncolors - 1)
+                try:
+                    curses.init_pair(i, fg_c, bg_c)
+                    self.attrs[element] = curses.color_pair(i)
+                except (curses.error, ValueError):
+                    self.attrs[element] = _mono_attr(element)
         else:
             for element, attr_list in MONOCHROME.items():
                 attr = 0
@@ -219,9 +236,16 @@ class Screen:
         vis_start = ed.buffer.line_start(ed.top_line)
         vis_end = ed.buffer.line_start(last_ln) + ed.buffer.line_length(last_ln)
         match_offsets = set()
-        for s, e in ed.search.matches:
-            if s < vis_end and e > vis_start:
-                match_offsets.update(range(s, e))
+        matches = ed.search.matches
+        if matches:
+            from bisect import bisect_left
+            qlen = max(1, len(ed.search.query))
+            i = bisect_left(matches, (max(0, vis_start - qlen), 0))
+            for s, e in matches[i:]:
+                if s >= vis_end:
+                    break
+                if e > vis_start:
+                    match_offsets.update(range(max(s, vis_start), min(e, vis_end)))
         sel = ed.selection
         for row in range(1, h - 1):
             ln = ed.top_line + (row - 1)

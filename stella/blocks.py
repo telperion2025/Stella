@@ -8,11 +8,12 @@ are implemented here against a buffer and a clipboard.
 
 
 class Selection:
-    __slots__ = ("anchor", "cursor")
+    __slots__ = ("anchor", "cursor", "inclusive")
 
-    def __init__(self, anchor, cursor=None):
+    def __init__(self, anchor, cursor=None, inclusive=False):
         self.anchor = anchor
         self.cursor = anchor if cursor is None else cursor
+        self.inclusive = inclusive
 
     @property
     def start(self):
@@ -20,7 +21,10 @@ class Selection:
 
     @property
     def end(self):
-        return max(self.anchor, self.cursor)
+        end = max(self.anchor, self.cursor)
+        if self.inclusive:
+            end += 1
+        return end
 
     def __len__(self):
         return self.end - self.start
@@ -71,9 +75,14 @@ def duplicate_selection(buffer, selection):
 
 
 def move_selection(buffer, selection, dest):
-    """Move the selected range to absolute offset *dest*."""
+    """Move the selected range to absolute offset *dest*.
+
+    A destination inside the selection itself is a no-op.
+    """
     if selection is None or len(selection) == 0:
         return 0
+    if selection.start <= dest <= selection.end:
+        return selection.start
     text = buffer.slice(selection.start, selection.end)
     start, end = selection.start, selection.end
     buffer.delete(start, end - start)

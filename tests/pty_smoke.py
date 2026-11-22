@@ -9,8 +9,9 @@ import sys
 import tempfile
 import termios
 import time
+from pathlib import Path
 
-REPO = "/workspace/github__telperion2025__Stella"
+REPO = str(Path(__file__).resolve().parents[1])
 
 
 def run_editor(args, key_sequences, timeout=15):
@@ -150,7 +151,7 @@ with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as fh:
 # v, ll (select 'lin'), y, then G? -> use '$' 'o'? simpler: select first 4 chars, y, move to end 'A'? 
 # do: v l l l y  then j $ p  -> paste after end of line 2
 rc, out = run_editor(["--mode", "vi", path8],
-                     [b"v", b"llll", b"y", b"j", b"$", b"p", b"\x1b", b":wq\r"])
+                     [b"v", b"lll", b"y", b"j", b"$", b"p", b"\x1b", b":wq\r"])
 content = open(path8, encoding="utf-8").read()
 check("vi: visual yank/paste", content == "line one\nline twoline\n", repr(content))
 check("vi: clean exit", rc == 0 and b"Traceback" not in out, f"rc={rc}")
