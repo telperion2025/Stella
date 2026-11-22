@@ -1,0 +1,14 @@
+PRINTING AND PDF OUTPUT
+
+  Ctrl-K P  print menu
+
+Printing (Version 1 path):
+  document text -> PostScript -> lpr filename.ps
+  The generated PostScript is sent to the printer with lpr.
+
+PDF generation:
+  document text -> PostScript -> ps2pdf -> PDF file
+  Choose PDF in the Ctrl-K P menu and give an output file name
+  (default: <document>.pdf).  Requires ghostscript's ps2pdf.
+
+The PostScript output uses Courier, 80 columns, 54 lines per page.

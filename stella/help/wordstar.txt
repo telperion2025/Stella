@@ -1,0 +1,39 @@
+WORDSTAR COMMANDS (default mode)
+
+Cursor diamond
+  Ctrl-E  up            Ctrl-X  down
+  Ctrl-S  left          Ctrl-D  right
+
+Word navigation
+  Ctrl-A  previous word        Ctrl-F  next word
+
+Screen / file navigation
+  Ctrl-R  page up              Ctrl-C  page down
+  Ctrl-W  scroll up one line   Ctrl-Z  scroll down one line
+  Ctrl-Q S  beginning of line  Ctrl-Q D  end of line
+  Ctrl-Q R  beginning of file  Ctrl-Q C  end of file
+
+Search
+  Ctrl-Q F  find              Ctrl-Q A  search and replace
+  Ctrl-L    repeat last search
+
+Undo / redo
+  Ctrl-U  undo                Ctrl-Y  redo
+
+File commands (prefix Ctrl-K)
+  Ctrl-K S  save              Ctrl-K D  save as
+  Ctrl-K X  save and exit     Ctrl-K Q  quit (asks if modified)
+  Ctrl-K P  print / PDF       Ctrl-K H  help
+  Ctrl-K M  switch to vi mode
+
+Block commands (prefix Ctrl-B)
+  Ctrl-B B  begin block       Ctrl-B E  end block
+  Ctrl-B C  copy block        Ctrl-B M  move block
+  Ctrl-B D  delete block      Ctrl-B U  unmark block
+
+Editing
+  Ins     toggle insert/overwrite     Enter  new line
+  Tab     insert tab                  Backspace  delete left
+  Del     delete character            F1     help
+  F2      switch editing mode
+  Arrow keys, PgUp/PgDn, Home/End and the mouse also work.

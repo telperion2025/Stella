@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stella"
+version = "1.0.0"
+description = "Stella - a WordStar-inspired console text editor (WSX v1.0) in Python 3 / curses"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+
+[project.scripts]
+stella = "stella.main:main"
+
+[tool.setuptools.packages.find]
+include = ["stella*"]
+
+[tool.setuptools.package-data]
+stella = ["help/*.txt"]

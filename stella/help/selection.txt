@@ -1,0 +1,21 @@
+SELECTION OPERATIONS
+
+Stella uses one unified selection model for every selection method:
+
+  WordStar block   Ctrl-B B (begin) ... Ctrl-B E (end)
+  vi visual mode   v (character-wise) or V (line-wise) in vi mode
+  Keyboard         move with the cursor while a block/visual mark is active
+  Mouse            click to place the cursor, drag to select,
+                   scroll wheel to scroll
+
+Selected text is always highlighted (black on cyan on colour terminals,
+reverse video on monochrome terminals).  Single-line and multi-line
+selections are supported and update dynamically while dragging.
+
+Block commands (Ctrl-B prefix, WordStar mode)
+  Ctrl-B C  copy selection to clipboard
+  Ctrl-B M  move selection to the cursor
+  Ctrl-B D  delete selection
+  Ctrl-B U  unmark (clear) selection
+
+In vi visual mode: d deletes the selection, y copies it, Esc exits.

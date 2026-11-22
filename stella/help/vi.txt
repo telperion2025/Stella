@@ -1,0 +1,32 @@
+VI COMMANDS (vi mode, toggled with F2)
+
+Modes: NORMAL (default), INSERT, VISUAL, COMMAND (the ':' line).
+
+Normal mode movement
+  h j k l  left/down/up/right
+  w  next word   b  previous word   e  end of word
+  0  beginning of line   ^  first non-blank   $  end of line
+  Ctrl-F page forward   Ctrl-B page back
+  Ctrl-D half page down  Ctrl-U half page up
+
+Editing
+  x  delete character     dd  delete line
+  yy copy (yank) line     p  paste after cursor
+  u  undo                 Ctrl-R  redo
+  i  insert before cursor    I  insert at line start
+  a  append after cursor      A  append at end of line
+  o  open line below          O  open line above
+
+Search
+  /text  search forward   n  next match   N  previous match
+
+Visual mode
+  v  character selection   V  line selection
+  movement extends the selection; d deletes it, y yanks it, Esc exits.
+
+Command mode (':')
+  :w   save            :w filename  save as
+  :q   quit            :q!          quit without saving
+  :wq  save and quit   :x           save and quit
+
+F1 help, F2 switch back to WordStar mode.

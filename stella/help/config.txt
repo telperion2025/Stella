@@ -1,0 +1,28 @@
+CONFIGURATION GUIDE
+
+Stella reads its configuration from ~/.stellarc, falling back to
+~/.wsxrc.  Format: one key=value per line, '#' starts a comment.
+
+Options:
+  default_mode=wordstar   startup mode: wordstar or vi
+  tab_width=4             spaces per tab stop
+  mouse=true              enable mouse support (true/false)
+  spellcheck=false        reserved for a future version
+  theme=wordstar          colour theme (wordstar; monochrome is used
+                          automatically when the terminal has no colour)
+  copy_key=^C             shortcut for copy selection
+  cut_key=^W              shortcut for cut selection
+  paste_key=^V            shortcut for paste
+
+Example ~/.stellarc:
+  default_mode=wordstar
+  tab_width=4
+  mouse=true
+  spellcheck=false
+  theme=wordstar
+  copy_key=^C
+  cut_key=^W
+  paste_key=^V
+
+The startup mode can also be chosen per invocation:
+  stella --mode vi document.txt

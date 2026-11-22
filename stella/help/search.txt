@@ -1,0 +1,16 @@
+SEARCH COMMANDS
+
+WordStar mode:
+  Ctrl-Q F  find            - prompts for the search text, highlights
+                              all matches (black on yellow) and selects
+                              the first match at/after the cursor
+  Ctrl-L    repeat last search (find next, wraps around)
+  Ctrl-Q A  search and replace - prompts for the text to find, the
+                              replacement, and whether to replace all
+
+vi mode:
+  /text   search forward, Enter to confirm
+  n       next match        N  previous match
+
+Version 1 uses plain text search (case sensitive); regular expressions
+are planned for a future version.

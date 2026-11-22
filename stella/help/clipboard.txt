@@ -1,0 +1,18 @@
+CLIPBOARD COMMANDS
+
+Default shortcuts (configurable in the config file):
+  Ctrl-C  copy selection
+  Ctrl-W  cut selection (copy + delete)
+  Ctrl-V  paste at cursor
+
+Stella always keeps an internal clipboard.  When the host provides one,
+the system clipboard is used as well:
+  Linux:   xclip, xsel or wl-copy / wl-paste
+  macOS:   pbcopy / pbpaste
+
+Configure the shortcuts in ~/.stellarc (or ~/.wsxrc), e.g.:
+  copy_key=^C
+  cut_key=^W
+  paste_key=^V
+
+In vi mode, yy yanks a line and p pastes it.
