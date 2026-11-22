@@ -28,8 +28,12 @@ File commands (prefix Ctrl-K)
 
 Block commands (prefix Ctrl-B)
   Ctrl-B B  begin block       Ctrl-B E  end block
-  Ctrl-B C  copy block        Ctrl-B M  move block
-  Ctrl-B D  delete block      Ctrl-B U  unmark block
+  Ctrl-B C  copy block        Ctrl-B V  paste at cursor
+  Ctrl-B M  move block        Ctrl-B D  delete block
+  Ctrl-B U  unmark block
+(With only Ctrl-B B marked, the cursor is the implicit block end.
+ While a block is marked, Ctrl-C/Ctrl-W act as copy/cut; otherwise
+ they are page-down/scroll.  Ctrl-V always pastes.)
 
 Editing
   Ins     toggle insert/overwrite     Enter  new line

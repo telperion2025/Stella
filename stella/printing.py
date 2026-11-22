@@ -72,17 +72,23 @@ def make_temp_postscript(text, title="document"):
 
 
 def print_postscript(ps_path, printer=None):
-    """Send *ps_path* to the printer with lpr.  Returns (ok, message)."""
+    """Send *ps_path* to the printer with lpr.  Returns (ok, message).
+
+    If the queue rejects the PostScript document (common on CUPS queues
+    configured for PDF only), retry with ``-o raw``.
+    """
     if shutil.which("lpr") is None:
         return False, "lpr not found on this system"
-    cmd = ["lpr"] + (["-P", printer] if printer else []) + [str(ps_path)]
-    try:
-        result = subprocess.run(cmd, capture_output=True, timeout=60, check=False)
-    except (OSError, subprocess.SubprocessError) as exc:
-        return False, str(exc)
-    if result.returncode == 0:
-        return True, "Print job sent (lpr %s)" % ps_path
-    err = result.stderr.decode("utf-8", errors="replace").strip()
+    base = ["lpr"] + (["-P", printer] if printer else [])
+    for extra in ([], ["-o", "raw"]):
+        cmd = base + extra + [str(ps_path)]
+        try:
+            result = subprocess.run(cmd, capture_output=True, timeout=60, check=False)
+        except (OSError, subprocess.SubprocessError) as exc:
+            return False, str(exc)
+        if result.returncode == 0:
+            return True, "Print job sent (lpr %s%s)" % (" ".join(extra) + " " if extra else "", ps_path)
+        err = result.stderr.decode("utf-8", errors="replace").strip()
     return False, err or "lpr failed"
 
 
