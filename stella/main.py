@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .commands import Editor
 from .config import load_config
+from .screen import disable_tty_flow_control
 
 
 def main(argv=None):
@@ -29,9 +30,15 @@ def main(argv=None):
     if args.file:
         try:
             text = Path(args.file).read_text(encoding="utf-8", errors="replace")
+        except FileNotFoundError:
+            text = ""  # new file: vi-style, created on first save
         except OSError as exc:
             print("stella: cannot open %s: %s" % (args.file, exc), file=sys.stderr)
             return 1
+
+    # Disable tty flow control before curses starts so ^S/^Q/^C are never
+    # consumed by the line discipline, even during startup.
+    disable_tty_flow_control()
 
     def _run(stdscr):
         editor = Editor(stdscr, filename=args.file, text=text, config=config)

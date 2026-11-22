@@ -25,6 +25,36 @@ def _mono_attr(element):
     return attr
 
 
+def disable_tty_flow_control(fd=None):
+    """Clear tty flags so ^S/^Q/^C/^V and friends reach the application.
+
+    Called before curses starts (so no key byte is ever eaten by the line
+    discipline) and again after curses initialises its own mode.
+    """
+    import sys
+    if fd is None:
+        if not sys.stdin.isatty():
+            return
+        fd = sys.stdin.fileno()
+    try:
+        attrs = termios.tcgetattr(fd)
+    except (termios.error, OSError, ValueError):
+        return
+
+    def _flag(name):
+        return getattr(termios, name, 0)
+
+    iflag = (_flag("IXON") | _flag("IXOFF") | _flag("IXANY")
+             | _flag("ICRNL") | _flag("IBRNL"))
+    lflag = _flag("ISIG") | _flag("IEXTEN")
+    attrs[0] &= ~iflag
+    attrs[3] &= ~lflag
+    try:
+        termios.tcsetattr(fd, termios.TCSANOW, attrs)
+    except (termios.error, OSError, ValueError):
+        pass
+
+
 def display_col(text, col, tab_width):
     """Display column (tab-expanded) of character column *col* in *text*."""
     x = 0
@@ -69,21 +99,7 @@ class Screen:
         curses.cbreak()
         curses.curs_set(1)
         # Deliver ^S/^Q/^C etc. to the program instead of the tty driver.
-        try:
-            import sys
-            fd = sys.stdin.fileno() if sys.stdin.isatty() else 0
-            attrs = termios.tcgetattr(fd)
-
-            def _flag(name):
-                return getattr(termios, name, 0)
-
-            iflag = _flag("IXON") | _flag("IXOFF") | _flag("ICRNL") | _flag("IBRNL")
-            lflag = _flag("ISIG") | _flag("IEXTEN")
-            attrs[0] &= ~iflag
-            attrs[3] &= ~lflag
-            termios.tcsetattr(fd, termios.TCSANOW, attrs)
-        except (termios.error, OSError, ValueError):
-            pass
+        disable_tty_flow_control()
         if curses.has_colors():
             try:
                 curses.start_color()

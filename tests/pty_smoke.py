@@ -26,7 +26,22 @@ def run_editor(args, key_sequences, timeout=15):
     os.close(slave)
     out = b""
     try:
-        time.sleep(1.2)  # let python + curses initialise before sending keys
+        # wait for the first rendered frame before sending keys, so slow
+        # machines never race the tty/curses initialisation
+        deadline = time.time() + 15
+        while time.time() < deadline and proc.poll() is None:
+            r, _, _ = select.select([master], [], [], 0.2)
+            if not r:
+                continue
+            try:
+                data = os.read(master, 65536)
+            except OSError:
+                break
+            if not data:
+                break
+            out += data
+            if b"Ln:" in out or b"WORDSTAR" in out or b"NORMAL" in out:
+                break
         for keys in key_sequences:
             time.sleep(0.35)
             try:
@@ -191,6 +206,14 @@ rc, out = run_editor([path12], [b"\x1b[2~", b"X", b"\x0bX"])
 content = open(path12, encoding="utf-8").read()
 check("ws: overwrite mode", content == "Xbc\n", repr(content))
 check("ws: OVR shown in status", b"OVR" in out)
+
+# --- Test 13: nonexistent file opens as a new empty buffer (vi-style) --------
+new_path = os.path.join(tempfile.mkdtemp(prefix="stella-new-"), "fresh.txt")
+assert not os.path.exists(new_path)
+rc, out = run_editor([new_path], [b"brand new file", b"\x0bX"])  # ^K X saves+exits
+check("new file: created on save", os.path.exists(new_path)
+      and open(new_path, encoding="utf-8").read() == "brand new file")
+check("new file: clean exit", rc == 0 and b"Traceback" not in out, f"rc={rc}")
 
 print()
 if failures:
