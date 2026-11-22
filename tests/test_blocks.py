@@ -58,6 +58,21 @@ class TestSelection(unittest.TestCase):
         self.assertEqual(blocks.cut_selection(b, s, clip), "")
         self.assertEqual(b.text, "abc")
 
+    def test_inclusive_selection(self):
+        s = blocks.Selection(2, 5, inclusive=True)
+        self.assertEqual((s.start, s.end), (2, 6))  # cursor char included
+        s2 = blocks.Selection(5, 2, inclusive=True)
+        self.assertEqual((s2.start, s2.end), (2, 6))
+        s3 = blocks.Selection(2, 5)
+        self.assertEqual((s3.start, s3.end), (2, 5))
+
+    def test_move_selection_into_itself_is_noop(self):
+        b = GapBuffer("abcdef")
+        s = blocks.Selection(1, 3)
+        dest = blocks.move_selection(b, s, 2)
+        self.assertEqual(b.text, "abcdef")
+        self.assertEqual(dest, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

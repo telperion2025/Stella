@@ -1,9 +1,18 @@
 CLIPBOARD COMMANDS
 
+WordStar block commands (Ctrl-B prefix):
+  Ctrl-B C  copy block        Ctrl-B V  paste at cursor
+  Ctrl-B M  move block (= cut + paste)
+  Ctrl-B D  delete block
+
 Default shortcuts (configurable in the config file):
   Ctrl-C  copy selection
   Ctrl-W  cut selection (copy + delete)
   Ctrl-V  paste at cursor
+
+In WordStar mode ^C/^W are also the page-down/scroll keys from the
+navigation map, so there they act as copy/cut only while a block or
+selection is marked; ^V always pastes.  In vi mode they always work.
 
 Stella always keeps an internal clipboard.  When the host provides one,
 the system clipboard is used as well:

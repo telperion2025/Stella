@@ -41,6 +41,18 @@ class TestGapBuffer(unittest.TestCase):
         self.assertEqual(removed, "world")
         self.assertEqual(b.text, "hello there")
 
+    def test_replace_middle(self):
+        b = GapBuffer("abcdef")
+        removed = b.replace(1, 2, "XY")
+        self.assertEqual(removed, "bc")
+        self.assertEqual(b.text, "aXYdef")
+
+    def test_replace_middle_with_newline(self):
+        b = GapBuffer("ab\ncd\nef")
+        b.replace(1, 3, "X\nY")
+        self.assertEqual(b.text, "aX\nYd\nef")
+        self.assertEqual([b.line(i) for i in range(b.line_count)], ["aX", "Yd", "ef"])
+
     def test_line_index_basic(self):
         b = GapBuffer("ab\ncd\nef")
         self.assertEqual(b.line_count, 3)

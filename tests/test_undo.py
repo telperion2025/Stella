@@ -57,6 +57,18 @@ class TestUndo(unittest.TestCase):
         h.undo(b)
         self.assertEqual(b.text, "")
 
+    def test_consecutive_backspaces_merge(self):
+        b = GapBuffer("abc")
+        h = UndoHistory()
+        for pos in (2, 1, 0):
+            deleted = b.slice(pos, pos + 1)
+            b.delete(pos, 1)
+            h.push(pos, deleted, "")
+        self.assertEqual(b.text, "")
+        h.undo(b)  # one undo restores the whole run
+        self.assertEqual(b.text, "abc")
+        self.assertFalse(h.can_undo())
+
     def test_push_clears_redo(self):
         b = GapBuffer("x")
         h = UndoHistory()

@@ -9,8 +9,9 @@ import sys
 import tempfile
 import termios
 import time
+from pathlib import Path
 
-REPO = "/workspace/github__telperion2025__Stella"
+REPO = str(Path(__file__).resolve().parents[1])
 
 
 def run_editor(args, key_sequences, timeout=15):
@@ -25,7 +26,22 @@ def run_editor(args, key_sequences, timeout=15):
     os.close(slave)
     out = b""
     try:
-        time.sleep(1.2)  # let python + curses initialise before sending keys
+        # wait for the first rendered frame before sending keys, so slow
+        # machines never race the tty/curses initialisation
+        deadline = time.time() + 15
+        while time.time() < deadline and proc.poll() is None:
+            r, _, _ = select.select([master], [], [], 0.2)
+            if not r:
+                continue
+            try:
+                data = os.read(master, 65536)
+            except OSError:
+                break
+            if not data:
+                break
+            out += data
+            if b"Ln:" in out or b"WORDSTAR" in out or b"NORMAL" in out:
+                break
         for keys in key_sequences:
             time.sleep(0.35)
             try:
@@ -150,7 +166,7 @@ with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as fh:
 # v, ll (select 'lin'), y, then G? -> use '$' 'o'? simpler: select first 4 chars, y, move to end 'A'? 
 # do: v l l l y  then j $ p  -> paste after end of line 2
 rc, out = run_editor(["--mode", "vi", path8],
-                     [b"v", b"llll", b"y", b"j", b"$", b"p", b"\x1b", b":wq\r"])
+                     [b"v", b"lll", b"y", b"j", b"$", b"p", b"\x1b", b":wq\r"])
 content = open(path8, encoding="utf-8").read()
 check("vi: visual yank/paste", content == "line one\nline twoline\n", repr(content))
 check("vi: clean exit", rc == 0 and b"Traceback" not in out, f"rc={rc}")
@@ -190,6 +206,61 @@ rc, out = run_editor([path12], [b"\x1b[2~", b"X", b"\x0bX"])
 content = open(path12, encoding="utf-8").read()
 check("ws: overwrite mode", content == "Xbc\n", repr(content))
 check("ws: OVR shown in status", b"OVR" in out)
+
+# --- Test 13: nonexistent file opens as a new empty buffer (vi-style) --------
+new_path = os.path.join(tempfile.mkdtemp(prefix="stella-new-"), "fresh.txt")
+assert not os.path.exists(new_path)
+rc, out = run_editor([new_path], [b"brand new file", b"\x0bX"])  # ^K X saves+exits
+check("new file: created on save", os.path.exists(new_path)
+      and open(new_path, encoding="utf-8").read() == "brand new file")
+check("new file: clean exit", rc == 0 and b"Traceback" not in out, f"rc={rc}")
+
+# --- Test 14: ^B V pastes the block (WordStar-style paste) -------------------
+with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as fh:
+    fh.write("abcdef")
+    path14 = fh.name
+# ^Q C, ^B B, ^Q R, ^B E, ^B C (copy), ^Q C, ^B V (paste), ^K X
+rc, out = run_editor([path14], [b"\x11C", b"\x02B", b"\x11R", b"\x02E", b"\x02C",
+                                b"\x11C", b"\x02V", b"\x0bX"])
+content = open(path14, encoding="utf-8").read()
+check("ws: ^B V pastes block", content == "abcdefabcdef", repr(content))
+
+# --- Test 15: ^W cuts when a block is marked ----------------------------------
+with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as fh:
+    fh.write("abcdef")
+    path15 = fh.name
+# ^Q C, ^B B, ^Q R, ^B E, ^W (cut block), ^K X
+rc, out = run_editor([path15], [b"\x11C", b"\x02B", b"\x11R", b"\x02E", b"\x17", b"\x0bX"])
+content = open(path15, encoding="utf-8").read()
+check("ws: ^W cuts marked block", content == "", repr(content))
+check("ws: cut exits clean", rc == 0 and b"Traceback" not in out, f"rc={rc}")
+
+# --- Test 16: Ins key enters insert mode in vi normal, toggles OVR in insert --
+with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as fh:
+    fh.write("ab\n")
+    path16 = fh.name
+# vi mode: Ins (\x1b[2~) -> insert, type X, Esc, :wq
+rc, out = run_editor(["--mode", "vi", path16],
+                     [b"\x1b[2~", b"X", b"\x1b", b":wq\r"])
+content = open(path16, encoding="utf-8").read()
+check("vi: Ins enters insert mode", content == "Xab\n", repr(content))
+
+with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as fh:
+    fh.write("ab\n")
+    path17 = fh.name
+# vi: i, Ins (toggle OVR), type X (overwrites 'a'), Esc, :wq
+rc, out = run_editor(["--mode", "vi", path17],
+                     [b"i", b"\x1b[2~", b"X", b"\x1b", b":wq\r"])
+content = open(path17, encoding="utf-8").read()
+check("vi: Ins in insert toggles overwrite", content == "Xb\n", repr(content))
+
+# --- Test 17: help navigable with WordStar diamond keys -----------------------
+with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as fh:
+    fh.write("hi\n")
+    path18 = fh.name
+# F1, ^X (down in menu), Enter (open topic 2), ^X/^E scroll doc, Esc, F1... quit
+rc, out = run_editor([path18], [b"\x1bOP", b"\x18", b"\r", b"\x18", b"\x05", b"\x1b", b"\x1bOP", b"\x0bQ", b"y"])
+check("help: diamond keys navigate", b"vi commands" in out and rc == 0 and b"Traceback" not in out, f"rc={rc}")
 
 print()
 if failures:

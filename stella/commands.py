@@ -43,7 +43,8 @@ class Editor:
         self.vi_pending = None   # pending vi operator: 'd' or 'y'
         self.prompt = None       # (label, text) while prompting
         self.dragging = False
-        self.block_active = False  # a WordStar block mark survives cursor moves
+        self.block_active = False   # a WordStar block mark survives cursor moves
+        self.block_end_set = False  # whether ^B E was pressed after ^B B
 
     # ------------------------------------------------------------------
     # helpers
@@ -220,6 +221,8 @@ class Editor:
         self.clamp_cursor()
         if not self.block_active:
             self.selection = None
+        self.search.matches = []  # match offsets are stale after an edit
+        self.search.index = -1
 
     def insert_text(self, s):
         if self.insert_mode or self.cursor >= len(self.buffer):
@@ -251,12 +254,15 @@ class Editor:
         end = start + self.buffer.line_length(line)
         if line + 1 < self.buffer.line_count:
             end += 1  # include the newline
+            yank = self.buffer.line(line) + "\n"
         elif line > 0:
             start -= 1  # no next line: remove the preceding newline instead
+            yank = self.buffer.line(line) + "\n"
+        else:
+            yank = self.buffer.line(line)
         if end > start:
-            removed = self.buffer.slice(start, end)
             self.apply_edit(start, end - start, "", cursor=start)
-            self.clipboard.copy(removed)
+            self.clipboard.copy(yank)
 
     def open_line(self, below=True):
         line, _col = self.line_col()
@@ -269,6 +275,8 @@ class Editor:
 
     def undo(self):
         pos = self.history.undo(self.buffer)
+        self.search.matches = []
+        self.search.index = -1
         if pos is None:
             self.set_message("Nothing to undo", error=True)
         else:
@@ -279,6 +287,8 @@ class Editor:
 
     def redo(self):
         pos = self.history.redo(self.buffer)
+        self.search.matches = []
+        self.search.index = -1
         if pos is None:
             self.set_message("Nothing to redo", error=True)
         else:
@@ -347,6 +357,9 @@ class Editor:
             return
         dest = self.cursor
         sel = self.selection
+        if sel.start <= dest <= sel.end:
+            self.set_message("Destination is inside the block", error=True)
+            return
         text = blocks.selected_text(self.buffer, sel)
         start, end = sel.start, sel.end
         self.apply_edit(start, end - start, "", cursor=start)
@@ -518,7 +531,7 @@ class Editor:
     # ------------------------------------------------------------------
     def on_mouse(self, ev):
         x, y, bstate = ev
-        b1 = curses.BUTTON1_PRESSED
+        b1 = curses.BUTTON1_PRESSED | getattr(curses, "BUTTON1_CLICKED", 0)
         b1_release = getattr(curses, "BUTTON1_RELEASED", 0)
         motion = curses.REPORT_MOUSE_POSITION
         wheel_up = curses.BUTTON4_PRESSED
@@ -565,7 +578,17 @@ class Editor:
             return
         if kind == "ctrl":
             token = "^" + val
-            if val in ("E", "X", "S", "D"):
+            has_sel = self.selection is not None and len(self.selection) > 0
+            # Clipboard shortcuts win over navigation when a block/selection
+            # is active (^C and ^W are also page/scroll keys per the spec,
+            # so without a selection they keep their navigation meaning).
+            if token == paste_key:
+                self.paste()
+            elif has_sel and token == copy_key:
+                self.copy_selection()
+            elif has_sel and token == cut_key:
+                self.cut_selection()
+            elif val in ("E", "X", "S", "D"):
                 self.move_lines({"E": -1, "X": 1}.get(val, 0) or 0)
                 if val in ("S", "D"):
                     self.move_cols(-1 if val == "S" else 1)
@@ -593,12 +616,6 @@ class Editor:
                 self.undo()
             elif val == "Y":
                 self.redo()
-            elif token == copy_key:
-                self.copy_selection()
-            elif token == cut_key:
-                self.cut_selection()
-            elif token == paste_key:
-                self.paste()
         elif kind == "key":
             if val == "UP":
                 self.move_lines(-1)
@@ -671,26 +688,37 @@ class Editor:
         elif prefix == "B":
             if ch == "B":
                 self.block_active = True
+                self.block_end_set = False
                 self.selection = blocks.Selection(self.cursor)
                 self.set_message("Block begin marked")
             elif ch == "E":
                 if self.selection is None:
                     self.selection = blocks.Selection(self.cursor)
                 self.block_active = True
+                self.block_end_set = True
                 self.selection.cursor = self.cursor
                 self.set_message("Block end marked (%d chars)" % len(self.selection))
-            elif ch == "C":
-                self.copy_selection()
+            elif ch in ("C", "M", "D"):
+                # with only ^B B marked, the cursor is the implicit block end
+                if self.selection is not None and not self.block_end_set:
+                    self.selection.cursor = self.cursor
+                if ch == "C":
+                    self.copy_selection()
+                elif ch == "M":
+                    self.move_block()
+                else:
+                    self.delete_selection()
                 self.block_active = False
-            elif ch == "M":
-                self.move_block()
+                self.block_end_set = False
+            elif ch == "V":
+                self.paste()
+                self.selection = None
                 self.block_active = False
-            elif ch == "D":
-                self.delete_selection()
-                self.block_active = False
+                self.block_end_set = False
             elif ch == "U":
                 self.selection = None
                 self.block_active = False
+                self.block_end_set = False
                 self.set_message("Block unmarked")
             else:
                 self.set_message("Unknown ^B command: %s" % ch, error=True)
@@ -786,7 +814,9 @@ class Editor:
                 self.paste()
             return
         if kind == "key":
-            if val == "ENTER":
+            if val == "INS":
+                self.mode = "insert"
+            elif val == "ENTER":
                 self.move_lines(1)
             elif val == "BS":
                 self.move_cols(-1)
@@ -830,7 +860,10 @@ class Editor:
             elif c == "v":
                 self.mode = "visual"
                 if self.selection is None:
-                    self.selection = blocks.Selection(self.cursor)
+                    self.selection = blocks.Selection(self.cursor, inclusive=True)
+                else:
+                    self.selection.inclusive = True
+                    self.selection.cursor = self.cursor
             elif c == "V":
                 self.mode = "visual"
                 line, _col = self.line_col()
@@ -849,7 +882,9 @@ class Editor:
                 self.cursor -= 1
             return
         if kind == "key":
-            if val == "BS":
+            if val == "INS":
+                self.insert_mode = not self.insert_mode  # vi overwrite toggle
+            elif val == "BS":
                 self.backspace()
             elif val == "DEL":
                 self.delete_char()
@@ -870,6 +905,8 @@ class Editor:
     def vi_visual(self, kind, val):
         if kind == "key" and val == "ESC":
             self.mode = "normal"
+            if self.selection is not None:
+                self.selection.inclusive = False
             return
         if kind == "char" and val == "d":
             self.cut_selection()
@@ -881,6 +918,7 @@ class Editor:
             return
         if kind == "char" and val == "V":
             line, _col = self.line_col()
+            self.selection.inclusive = False
             self.selection.cursor = self.buffer.line_start(line) + self.buffer.line_length(line)
             return
         self.vi_motion(kind, val, extend=True)

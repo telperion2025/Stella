@@ -26,6 +26,7 @@ class Clipboard:
         self.internal = ""
         self.use_system = use_system
         self._tool = None
+        self._source = "internal"   # which store holds the latest copy
         if use_system:
             self._tool = self._detect_tool()
 
@@ -44,23 +45,26 @@ class Clipboard:
 
     def copy(self, text):
         """Store *text* in the internal clipboard and, when available, the
-        system clipboard."""
+        system clipboard.  Tracks which store holds the latest copy."""
         self.internal = text
+        self._source = "internal"
         if self._tool and self.use_system:
             cmd = _SET_COMMANDS[self._tool]
             try:
-                subprocess.run(
+                result = subprocess.run(
                     cmd, input=text.encode("utf-8"),
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                     timeout=5, check=False,
                 )
+                if result.returncode == 0:
+                    self._source = "system"
             except (OSError, subprocess.SubprocessError):
                 pass
 
     def paste(self):
-        """Return clipboard contents, preferring the system clipboard when
-        it holds text, otherwise the internal clipboard."""
-        if self._tool and self.use_system:
+        """Return the latest clipboard contents: the system clipboard when
+        the last copy landed there, otherwise the internal clipboard."""
+        if self._source == "system" and self._tool and self.use_system:
             get_tool = {"pbcopy": "pbpaste"}.get(self._tool, self._tool.replace("copy", "paste"))
             cmd = _GET_COMMANDS.get(get_tool)
             if cmd:

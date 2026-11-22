@@ -15,6 +15,26 @@ TOPICS = [
 ]
 
 
+def _nav(key):
+    """Translate a key to a help-navigation action.
+
+    Supports arrow keys, PgUp/PgDn, the WordStar diamond (^E ^X ^S ^D),
+    ^R/^C and ^W/^Z, vi-style h j k l, and ^F/^B/^D/^U — so help works even
+    on terminals without cursor keys.
+    """
+    kind, val = key
+    if kind == "ctrl":
+        return {"E": "up", "X": "down", "S": "left", "D": "right",
+                "R": "pageup", "C": "pagedown", "W": "up", "Z": "down",
+                "F": "pagedown", "B": "pageup", "D": "down", "U": "up"}.get(val)
+    if kind == "key":
+        return {"UP": "up", "DOWN": "down", "LEFT": "left", "RIGHT": "right",
+                "PPAGE": "pageup", "NPAGE": "pagedown"}.get(val)
+    if kind == "char":
+        return {"k": "up", "j": "down", "h": "left", "l": "right"}.get(val)
+    return None
+
+
 def load_topics():
     """Return a list of ``(title, body)`` help topics."""
     topics = []
@@ -57,14 +77,15 @@ class HelpViewer:
                 marker = ">" if i == self.menu_index else " "
                 self.screen._addstr(2 + i, 2, ("%s %d. %s" % (marker, i + 1, title)).ljust(w - 4),
                                     self.screen.attrs["edit"] if i != self.menu_index else self.screen.attrs["selection"])
-            self.screen._addstr(h - 1, 0, " Up/Down select  Enter open  F1/Esc quit".ljust(w), self.screen.attrs["help"])
+            self.screen._addstr(h - 1, 0, " Up/Down, ^E/^X, h/j select  Enter open  F1/Esc quit".ljust(w), self.screen.attrs["help"])
             self.screen.stdscr.refresh()
             kind, val = self.screen.read_key()
             if kind == "key" and val in ("ESC", "F1"):
                 return False
-            if kind == "key" and val == "UP":
+            nav = _nav((kind, val))
+            if nav == "up":
                 self.menu_index = (self.menu_index - 1) % len(self.topics)
-            elif kind == "key" and val == "DOWN":
+            elif nav == "down":
                 self.menu_index = (self.menu_index + 1) % len(self.topics)
             elif kind == "key" and val == "ENTER":
                 self.doc = self.topics[self.menu_index][1]
@@ -89,7 +110,7 @@ class HelpViewer:
                 idx = self.doc_top + i
                 if idx < len(lines):
                     self.screen._addstr(1 + i, 0, lines[idx][: w - 1], self.screen.attrs["edit"])
-            self.screen._addstr(h - 1, 0, " Up/Down/PgUp/PgDn scroll  Esc menu  F1 quit".ljust(w), self.screen.attrs["help"])
+            self.screen._addstr(h - 1, 0, " Arrows/PgUp/PgDn, ^E/^X/^S/^D, ^R/^C, hjkl scroll  Esc menu  F1 quit".ljust(w), self.screen.attrs["help"])
             self.screen.stdscr.refresh()
             kind, val = self.screen.read_key()
             if kind == "key" and val in ("ESC",):
@@ -102,11 +123,12 @@ class HelpViewer:
                 self.screen.resize()
                 h, w = self.screen.height, self.screen.width
                 rows = max(1, h - 2)
-            elif kind == "key" and val == "UP":
+            nav = _nav((kind, val))
+            if nav == "up":
                 self.doc_top = max(0, self.doc_top - 1)
-            elif kind == "key" and val == "DOWN":
+            elif nav == "down":
                 self.doc_top = min(max(0, len(lines) - rows), self.doc_top + 1)
-            elif kind == "key" and val == "PPAGE":
+            elif nav == "pageup":
                 self.doc_top = max(0, self.doc_top - rows)
-            elif kind == "key" and val == "NPAGE":
+            elif nav == "pagedown":
                 self.doc_top = min(max(0, len(lines) - rows), self.doc_top + rows)
